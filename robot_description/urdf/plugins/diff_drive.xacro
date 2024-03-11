@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="diff_drive">
+    <xacro:macro name="diff_drive" params="right_joint left_joint">
+        <gazebo>
+            <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+                <publishWheelTF>false</publishWheelTF>
+                <publishWheelJointState>false</publishWheelJointState>
+                <alwaysOn>true</alwaysOn>
+                <updateRate>10</updateRate>
+                <wheelAcceleration>0</wheelAcceleration>
+                <rosDebugLevel>Debug</rosDebugLevel>
+                <wheelTorque>12</wheelTorque>
+                <rightJoint>${right_joint}</rightJoint>
+                <leftJoint>${left_joint}</leftJoint>
+                <wheelSeparation>0.6</wheelSeparation>
+                <wheelDiameter>0.38</wheelDiameter>
+                <commandTopic>cmd_vel</commandTopic>
+                <odometryFrame>odom</odometryFrame>
+                <odometryTopic>odom</odometryTopic>
+                <robotBaseFrame>base_link</robotBaseFrame>
+                <legacyMode>false</legacyMode>
+            </plugin>
+        </gazebo>
+    </xacro:macro>
+</robot>

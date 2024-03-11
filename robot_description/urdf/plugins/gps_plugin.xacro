@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<robot name="gps_plugin" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="gps_plugin" params="xyz">
+    <link name="gps_link">
+      <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+          <box size="0.01 0.01 0.01"/>
+      </geometry>
+      </visual>
+          
+      <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+          <box size="0.01 0.01 0.01"/>
+      </geometry>
+      </collision>
+    </link>
+    <joint name="gps_joint" type="fixed">
+      <axis xyz="0 0 0"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+      <parent link="base_link"/>
+      <child link="gps_link"/>
+    </joint>
+    <gazebo>
+      <plugin name="gps_controller" filename="libhector_gazebo_ros_gps.so">
+        <updateRate>50.0</updateRate>
+        <bodyName>base_link</bodyName>
+        <alwaysOn>true</alwaysOn>
+        <topicName>mavros/global_position/global</topicName>
+        <serviceName>gps_service</serviceName>
+        <velocityTopicName>gps_velocity</velocityTopicName>
+        <drift>0.0 0.0 0.0</drift>
+        <gaussianNoise>0.0 0.0 0.0</gaussianNoise>
+        <velocityDrift>0 0 0</velocityDrift>
+        <velocityGaussianNoise>0.0 0.0 0.0</velocityGaussianNoise>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

@@ -1,0 +1,230 @@
+#! /usr/bin/python3
+
+import os
+from random import random
+from math import sin, cos, tanh, atan2, sqrt, pi
+import numpy as np
+import matplotlib.pyplot as plt
+
+import rospy
+from geometry_msgs.msg import Point, Pose, Twist, Vector3
+from nav_msgs.msg import Odometry
+from visualization_msgs.msg import Marker, MarkerArray
+from std_srvs.srv import Empty
+from sensor_msgs.msg import LaserScan
+
+from skeleton import Agent
+
+use_weights = False if os.sys.argv[1][0].lower() == 'n' else f"{os.sys.argv[1]}.pth"
+store_weights = f"{os.sys.argv[2]}.pth"
+
+class TrainerNode():
+
+    def __init__(self):
+
+        rospy.init_node("trainer")
+        plt.ion()
+
+        # agent init
+
+        self.agent = Agent(
+            scan_dims=640,
+            observation_dims=4,
+            n_actions=2,
+            alpha=0.0005,
+            gamma=0.9,
+            reuse=use_weights
+        )
+
+        self.min_scan:float = None
+        self.distance:float = None
+        self.steer:float = None
+
+        self.goal_tolerance = 0.6
+
+        self.scan:list = None
+        self.odom:Pose = None
+        self.goal:Pose = None
+
+        self.min_range:float = None
+        self.max_range:float = None
+
+        self.vel = Twist()
+
+        self.episode = 0
+        self.epochs = 0
+        self.episode_return = 0
+
+        self.scans = []
+        self.observations = []
+        self.rewards = []
+
+        # ros init
+
+        rospy.Subscriber("/odom", Odometry, self.get_odom)
+        rospy.Subscriber("/scan", LaserScan, self.get_scan)
+        
+        self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+        self.goal_pub = rospy.Publisher("/goal", Marker, queue_size=1)
+        self.confidence_pub = rospy.Publisher("/confidence", Marker, queue_size=1)
+
+        self.goal_marker = Marker()
+        self.goal_marker.header.frame_id = "odom"
+        self.goal_marker.ns = "goal"
+        self.goal_marker.id = 0
+        self.goal_marker.type = Marker.SPHERE
+        self.goal_marker.action = Marker.ADD
+        self.goal_marker.color.r = 0
+        self.goal_marker.color.g = 0
+        self.goal_marker.color.b = 1
+        self.goal_marker.color.a = 1
+        self.goal_marker.scale = Vector3(self.goal_tolerance, self.goal_tolerance, self.goal_tolerance)
+
+        self.confidence_bar = Marker()
+        self.confidence_bar.header.frame_id = "odom"
+        self.confidence_bar.ns = "confidence"
+        self.confidence_bar.id = 1
+        self.confidence_bar.type = Marker.CYLINDER
+        self.confidence_bar.action = Marker.ADD
+        self.confidence_bar.color.r = 1
+        self.confidence_bar.color.g = 0.9
+        self.confidence_bar.color.b = 0
+        self.confidence_bar.color.a = 1
+        self.confidence_bar.scale = Vector3(0.2, 0.2, 0)
+        self.confidence_bar.pose.position = Point(0, 0, 3)
+
+    def get_odom(self, odom):
+        self.odom = odom.pose.pose
+
+    def get_scan(self, scan):
+        self.min_range = scan.range_min
+        self.max_range = scan.range_max
+        scan = np.array(scan.ranges)
+        self.scan = np.minimum(scan, 5)
+
+    def respawn(self):
+        try:
+            reset = rospy.ServiceProxy("/gazebo/reset_simulation", Empty)
+            reset()
+        except rospy.ServiceException as e:
+            print(f"{type(e): {e}}")
+
+    def generate_random_goal(self, distance):
+        if (self.odom is None):
+            return None
+        theta = random() * 2*pi
+        self.goal = Pose()
+        self.goal.position = Point(distance*cos(theta), distance*sin(theta), 0)
+        self.goal_marker.pose = self.goal
+
+    def calculate_current_state(self):
+        if (self.goal is None or self.odom is None):
+            return None
+
+        dx = self.goal.position.x - self.odom.position.x
+        dy = self.goal.position.y - self.odom.position.y
+
+        bot_steer_angle = atan2(self.odom.orientation.z, self.odom.orientation.w) * 2
+
+        transform_angle = pi/2 - bot_steer_angle
+        sin_transform_angle = sin(transform_angle)
+        cos_transform_angle = cos(transform_angle)
+
+        transformed_dx = cos_transform_angle * dx - sin_transform_angle * dy
+        transformed_dy = sin_transform_angle * dx + cos_transform_angle * dy
+
+        scan = self.scan
+        min_scan = scan.min()
+        # scan = (scan - self.min_range)/(self.max_range - self.min_range)
+
+        observation = [transformed_dx, transformed_dy, self.vel.linear.x, self.vel.angular.z]
+        return scan.tolist(), observation, min_scan, atan2(-transformed_dx, transformed_dy), dx*dx + dy*dy # state, relative steer, distance 
+
+    def calculate_reward(self, distance, relative_steer, min_scan):
+
+        dS = 0 # self.min_scan - min_scan
+        dR = 0 # sqrt(self.distance) - sqrt(distance)
+        dA = -abs(relative_steer)/pi
+        reward = tanh(dR*20 + dA - dS*20)-1
+        return reward
+
+    def terminate_episode(self):
+
+        self.respawn()
+        self.agent.learn(self.scans, self.observations, self.rewards)
+        print(f"episode: {self.episode} return: {self.episode_return} epochs: {self.epochs}")
+
+        self.episode = self.episode + 1
+        self.episode_return = 0
+        self.epochs = 0
+
+        self.scans = []
+        self.observations = []
+        self.rewards = []
+
+        self.agent.save(store_weights)
+
+        self.scan = None
+        self.odom = None
+        self.goal = None
+
+        self.distance = None
+        self.steer = None
+
+    def __call__(self):
+
+        rate = rospy.Rate(10)
+        while (not rospy.is_shutdown()):
+            if (self.goal is None):
+                self.generate_random_goal(7)
+                self.distance = 49
+                self.min_scan = 0
+                continue
+            
+            if (self.scan is None):
+                continue
+
+            scan, observation, min_scan, relative_steer, distance = self.calculate_current_state()
+            mean, std, action = self.agent.choose_action(scan, observation)
+            self.confidence_bar.scale.z = sqrt(1/(std**2).sum().item())
+            self.confidence_bar.pose.position.z = 3 + 0.5 * self.confidence_bar.scale.z
+            v, w = action
+            self.vel.linear.x = v 
+            self.vel.angular.z = w
+            self.vel_pub.publish(self.vel)
+
+            self.epochs += 1
+
+            reached = bool(distance < self.goal_tolerance*self.goal_tolerance)
+            crashed = bool(min_scan <= 0.6)
+            reward = -3 if crashed else (1 if reached else self.calculate_reward(distance, relative_steer, min_scan))
+            self.episode_return += reward
+            time_up = bool(self.epochs >= 200)
+
+            done = int(reached or time_up or crashed)
+
+            self.scans.append([scan])
+            self.observations.append(observation)
+            self.rewards.append(reward)
+
+            self.min_scan = min_scan
+            self.distance = distance
+            self.steer = relative_steer
+
+            if (done):
+                reach = "\033[0;36m" if reached else ""
+                crash = "\033[0;31m" if crashed else ""
+                timeup = "\033[1;33m" if time_up else ""
+                start = reach + crash + timeup
+                print(start, end='')
+                self.terminate_episode()
+
+            self.goal_pub.publish(self.goal_marker)
+            self.confidence_pub.publish(self.confidence_bar)
+            rate.sleep()
+
+if (__name__ == "__main__"):
+
+    trainer = TrainerNode()
+    trainer()
+

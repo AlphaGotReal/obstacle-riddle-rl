@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="robot_name" value="solo"/>
+    <arg name="origin" default="-x 0 -y -23.5 -z 0.3 -R 0 -P 0 -Y 0"/>
+    <arg name="urdf_file" default="$(find robot_description)/urdf/robot.urdf.xacro"/>
+    <arg name="diff_drive_plugin" default="true" />
+    <arg name="lidar_plugin" default="true"/>
+    <arg name="upper_zed_plugin" default="true" />
+    <arg name="lower_zed_plugin" default="false" />
+    <arg name="gps_plugin" default="false" />
+
+    <param name="robot_description" command="$(find xacro)/xacro '$(arg urdf_file)'
+    diff_drive_plugin_enabled:=$(arg diff_drive_plugin)
+    lidar_plugin_enabled:=$(arg lidar_plugin)
+    upper_zed_plugin_enabled:=$(arg upper_zed_plugin)
+    lower_zed_plugin_enabled:=$(arg lower_zed_plugin)
+    gps_plugin_enabled:=$(arg gps_plugin)"/>
+
+    <node name="spawn_xacro" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-urdf $(arg origin) -model solo -param robot_description"/>
+
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+</launch>

@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<robot name="solo" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:arg name="diff_drive_plugin_enabled" default="true"/>
+    <xacro:arg name="zed2i_plugin_enabled" default="true"/>
+    <xacro:arg name="lidar_plugin_enabled" default="true"/>
+    <xacro:arg name="gps_plugin_enabled" default="true"/>
+
+    <xacro:include filename="assembly.urdf" ns="assembly"/>
+    <xacro:include filename="plugins/zed_plugin.xacro"/>
+    <xacro:include filename="plugins/diff_drive.xacro"/>
+    <xacro:include filename="plugins/lidar_plugin.xacro"/>
+    <xacro:include filename="plugins/gps_plugin.xacro"/>
+
+
+    <xacro:if value="$(arg diff_drive_plugin_enabled)">
+        <xacro:diff_drive left_joint="base_link_to_left_wheel" right_joint="base_link_to_right_wheel"/>
+    </xacro:if>
+
+    <xacro:if value="$(arg zed2i_plugin_enabled)">
+        <xacro:zed_plugin zed_name="zed2i" reflect="1"/>
+    </xacro:if>
+
+    <xacro:if value="$(arg lidar_plugin_enabled)">
+        <xacro:lidar_plugin lidar_link="lidar" topic_name="/scan"/>
+    </xacro:if>
+    
+    <link name="lidar">
+        <geometry>
+            <cylinder radius="0.024" length="0.026"/>
+        </geometry>
+    </link>
+    <joint name="base_link_to_lidar" type="fixed">
+        <parent link="base_link"/>
+        <child link="lidar"/>
+        <origin xyz="0.1335 0 0.71297" rpy="0 0 0"/>
+        <axis xyz="0 0 0"/>
+    </joint>
+
+	<xacro:if value="$(arg gps_plugin_enabled)">
+    	<xacro:gps_plugin xyz="0 0 0"/>
+    </xacro:if>
+
+    <!-- Camera Center -->
+    <link name="zed2i_camera_center">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://zed_wrapper/urdf/ZEDM.stl" />
+            </geometry>
+            <material name="light_grey">
+                <color rgba="0 0 0 0.9"/>
+            </material>
+        </visual>
+    </link>
+
+    <!-- Left Camera -->
+    <joint name="zed2i_left_camera_joint" type="fixed">
+        <parent link="zed2i_camera_center"/>
+        <child link="zed2i_left_camera_frame"/>
+        <origin xyz="0 0.03 0" rpy="0 0 0" />
+    </joint>
+
+    <link name="zed2i_left_camera_frame" />
+
+    <joint name="zed2i_left_camera_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="-1.57079632679 0.0 -1.57079632679"/>
+        <parent link="zed2i_left_camera_frame"/>
+        <child link="zed2i_left_camera_optical_frame"/>
+    </joint>
+
+    <link name="zed2i_left_camera_optical_frame"/>
+
+    <!-- Right Camera -->
+
+    <joint name="zed2i_right_camera_joint" type="fixed">
+        <parent link="zed2i_camera_center"/>
+        <child link="zed2i_right_camera_frame"/>
+        <origin xyz="0 -0.03 0" rpy="0 0 0" />
+    </joint>
+
+    <link name="zed2i_right_camera_frame" />
+
+    <joint name="zed2i_right_camera_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="-1.57079632679 0.0 -1.57079632679"/>
+        <parent link="zed2i_right_camera_frame"/>
+        <child link="zed2i_right_camera_optical_frame"/>
+    </joint>
+
+    <link name="zed2i_right_camera_optical_frame"/>
+
+    <!--   ZED Camera Center to Base Link -->
+    <joint name="zed2i_camera_center_joint" type="fixed">
+        <parent link="zed2i_cam"/>
+        <child link="zed2i_camera_center"/>
+        <origin xyz="0 0 0" rpy="1.57 -1.57 3.14" />
+    </joint>
+
+    <!-- IMU -->
+    <joint name="imu_link_joint" type="floating">
+        <parent link="zed2i_camera_center"/>
+        <child link="imu_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+    </joint>
+    <link name="imu_link" />
+</robot>

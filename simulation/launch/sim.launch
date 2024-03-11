@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <arg name="gui" default="true"/>
+    <arg name="origin_xyz" default="-x 0 -y -0 -z 0.35"/>
+    <arg name="origin_RPY" default="-R 0 -P 0 -Y 0"/>
+    <arg name="robot_name" default="sex" />
+
+    <!--ROBOT BS-->
+    <node pkg="tf" type="static_transform_publisher" name="map_odom" args="0 0 0 0 0 0 map odom 10"/>
+    <node pkg="tf" type="static_transform_publisher" name="laser" args="0.436 0 0.105 0 0 0 base_link base_scan_link 10"/>
+    <node pkg="tf" type="static_transform_publisher" name="footprint" args="0 0 0 0 0 0 base_link base_footprint 10"/>
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="world_name" value="$(find simulation)/worlds/reinforcement_learning.world" />
+        <arg name="gui" value="$(arg gui)" />
+    </include>
+    <include file="$(find robot_description)/launch/robot.launch" />
+    <!-- <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-file $(find simulation)/urdf/robot.urdf -urdf $(arg origin_xyz) $(arg origin_RPY) -model $(arg robot_name)" /> -->
+
+    <!--MAPPING-->
+    <!--include file="$(find turtlebot3_slam)/launch/turtlebot3_gmapping.launch">
+    </include-->
+
+	<!--PATH GENERATOR-->
+	<!--node pkg="water" type="autonav" name="auto_nav" output="screen" /-->
+	
+    <!--RVIZ-->
+    <node pkg="rviz" type="rviz" name="rizviz" args="-d $(find simulation)/sim.rviz" output="screen"/>
+
+</launch>
