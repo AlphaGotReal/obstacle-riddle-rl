@@ -44,5 +44,5 @@ rosrun lamp trainer <from-weights> <to-weights>
 - to-weight : this is the path to where you want to store your trained weights
 
 ## Here is the image of the agent 
-The yellow marker represents the confidence of the action it chose and the blue marker is the goal it has to reach with some tolerance
+-- The yellow marker represents the confidence of the action it chose and the blue marker is the goal it has to reach with some tolerance
 ![alt text](https://github.com/AlphaGotReal/obstacle-riddle-rl/blob/main/imgs/ss.png?raw=true)
